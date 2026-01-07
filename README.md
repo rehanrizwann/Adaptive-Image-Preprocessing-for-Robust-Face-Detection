@@ -1,13 +1,65 @@
-This project focuses on improving the accuracy of face detection systems using adaptive image preprocessing techniques. Traditional face detection methods, such as Haar Cascade classifiers, often fail under challenging conditions like low light, poor contrast, and noisy images. To address this, the system first analyzes the quality of the input image—including brightness, contrast, and noise levels—and then applies appropriate preprocessing steps such as:
+import cv2
+import numpy as np
 
-Grayscale conversion to simplify the image
+# Load input image
+image = cv2.imread("image.jpg")
+original_image = image.copy()
 
-Histogram equalization to enhance contrast
+# Convert to grayscale
+gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-Noise reduction using Gaussian or median filtering
+# Analyze image contrast
+contrast_mean = np.mean(gray_image)
+contrast_std = np.std(gray_image)
 
-Morphological operations to refine facial regions
+# Apply histogram equalization if contrast is low
+if contrast_std < 40:
+    gray_image = cv2.equalizeHist(gray_image)
 
-After preprocessing, the enhanced image is passed to the Haar Cascade classifier for face detection. The results are compared with baseline detection on raw images to demonstrate the improvement in accuracy and robustness.
+# Estimate noise level
+noise_variance = np.var(gray_image)
 
-This project shows that dynamic, adaptive preprocessing can make face detection systems more reliable and efficient in real-world environments, where image quality may vary significantly. It is useful for applications such as surveillance, biometric authentication, and human-computer interaction.
+# Apply adaptive noise reduction
+if noise_variance > 500:
+    gray_image = cv2.medianBlur(gray_image, 5)
+else:
+    gray_image = cv2.GaussianBlur(gray_image, (5, 5), 0)
+
+# Refine facial regions using morphological closing
+morph_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+gray_image = cv2.morphologyEx(gray_image, cv2.MORPH_CLOSE, morph_kernel)
+
+# Load Haar Cascade face detector
+face_cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+
+# Detect faces on raw image (baseline)
+baseline_faces = face_cascade.detectMultiScale(
+    cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY),
+    scaleFactor=1.1,
+    minNeighbors=5,
+    minSize=(30, 30)
+)
+
+# Detect faces on preprocessed image
+preprocessed_faces = face_cascade.detectMultiScale(
+    gray_image,
+    scaleFactor=1.05,
+    minNeighbors=6,
+    minSize=(30, 30)
+)
+
+# Draw rectangles for baseline faces (red)
+for (x, y, w, h) in baseline_faces:
+    cv2.rectangle(original_image, (x, y), (x + w, y + h), (0, 0, 255), 2)
+
+# Draw rectangles for preprocessed faces (green)
+for (x, y, w, h) in preprocessed_faces:
+    cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+# Combine images side by side for comparison
+comparison_image = np.hstack((original_image, image))
+
+# Display results
+cv2.imshow("Baseline (Red) vs Adaptive Preprocessing (Green)", comparison_image)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
